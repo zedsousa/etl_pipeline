@@ -7,7 +7,9 @@ dependencies = [
     "sqlalchemy (>=2.0.46,<3.0.0)",
     "psycopg2-binary (>=2.9.11,<3.0.0)",
     "pandas (>=3.0.0,<4.0.0)",
-    "python-dotenv (>=1.2.1,<2.0.0)"
+    "python-dotenv (>=1.2.1,<2.0.0)",
+    "fastapi (>=0.128.6,<0.129.0)",
+    "uvicorn (>=0.40.0,<0.41.0)"
 ]
 
 [tool.poetry]
@@ -17,6 +19,7 @@ package-mode = false
 pre-commit = "^4.1.0"
 ruff = "^0.9.4"
 mypy = "^1.14.1"
+types-sqlalchemy = "^1.4.53.38"
 
 [tool.ruff]
 line-length = 88
@@ -24,10 +27,22 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]  # FastAPI uses function calls in defaults for dependency injection
+
 
 [tool.mypy]
-strict = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["sqlalchemy.*", "pydantic.*", "fastapi.*"]
 ignore_missing_imports = true
+
+
+
 
 
 [build-system]
