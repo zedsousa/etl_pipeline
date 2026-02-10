@@ -11,6 +11,18 @@ services:
     volumes:
       - source_db_data:/var/lib/postgresql/data
 
+  target_db:
+    image: postgres:15
+    container_name: target_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: target_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - target_db_data:/var/lib/postgresql/data
+
   api:
     build:
       context: .
@@ -25,3 +37,4 @@ services:
 
 volumes:
   source_db_data:
+  target_db_data:
