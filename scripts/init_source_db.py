@@ -1,6 +1,6 @@
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -12,8 +12,8 @@ DB_URL = os.getenv("SOURCE_DB_URL")
 
 
 def generate_data() -> pd.DataFrame:
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=10)
+    start_date = datetime(2026, 1, 1)
+    end_date = datetime(2026, 1, 10, 23, 59)
 
     dates = pd.date_range(start=start_date, end=end_date, freq="1min")
 
