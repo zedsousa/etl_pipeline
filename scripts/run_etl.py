@@ -1,30 +1,28 @@
-import os
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 import pandas as pd
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 sys.path.append(str(Path(__file__).parent.parent))
 from models.target import Data
 
-load_dotenv()
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-API_URL = os.getenv("API_URL")
-TARGET_DB_URL = os.getenv("TARGET_DB_URL")
 
-
-def extract_data(date: datetime) -> list[dict]:
+def extract_data(client: httpx.Client, date: datetime) -> list[dict]:
     """Extrai dados brutos da API para uma data específica."""
     start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    response = httpx.get(
-        f"{API_URL}/data",
+    response = client.get(
+        "/data",
         params={
             "start_date": start_of_day.isoformat(),
             "end_date": end_of_day.isoformat(),
@@ -36,7 +34,7 @@ def extract_data(date: datetime) -> list[dict]:
 
     data: list[dict] = response.json()
 
-    print(f"{len(data)} registros extraídos com sucesso.")
+    logger.info(f"{len(data)} registros extraídos com sucesso.")
     return data
 
 
@@ -56,13 +54,13 @@ def transform_data(data: list[dict]) -> pd.DataFrame:
     aggregated.columns = ["_".join(col) for col in aggregated.columns]
     aggregated.reset_index(inplace=True)
 
-    print(f"{len(aggregated)} registros agregados com sucesso.")
+    logger.info(f"{len(aggregated)} registros agregados com sucesso.")
     return aggregated
 
 
 def load_data(df: pd.DataFrame, session: Session) -> None:
     """Carrega dados agregados no banco de dados alvo."""
-    print("Carregando dados no banco alvo...")
+    logger.info("Carregando dados no banco alvo...")
 
     signal_map = {
         "wind_speed_mean": 1,
@@ -91,29 +89,17 @@ def load_data(df: pd.DataFrame, session: Session) -> None:
     session.add_all(data_points)
     session.commit()
 
-    print(f"{len(data_points)} registros carregados com sucesso.")
+    logger.info(f"{len(data_points)} registros carregados com sucesso.")
 
 
-def run_etl(date: datetime) -> None:
+def run_etl(date: datetime, api_client: httpx.Client, db_session: Session) -> None:
     """Executa o pipeline ETL completo para uma data específica."""
-    print(f"Iniciando ETL para {date.strftime('%Y-%m-%d')}")
-
-    engine = create_engine(TARGET_DB_URL)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    logger.info(f"Iniciando ETL para {date.strftime('%Y-%m-%d')}")
 
     try:
-        data = extract_data(date)
+        data = extract_data(api_client, date)
         aggregated = transform_data(data)
-        load_data(aggregated, session)
+        load_data(aggregated, db_session)
     except Exception as e:
-        print(f"Erro durante o ETL: {str(e)}")
-    finally:
-        session.close()
-        print("ETL concluído.")
-
-
-if __name__ == "__main__":
-    from datetime import timedelta
-
-    run_etl(datetime.now() - timedelta(days=1))
+        logger.error(f"Erro durante o ETL: {str(e)}")
+        raise e
