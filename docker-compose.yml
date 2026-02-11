@@ -24,16 +24,47 @@ services:
       - target_db_data:/var/lib/postgresql/data
 
   api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
+    build: .
     container_name: api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     depends_on:
       - source_db
     environment:
       SOURCE_DB_URL: postgresql://postgres:postgres@source_db:5432/source_db
+
+  dagster_webserver:
+    build: .
+    container_name: dagster_webserver
+    command: dagster-webserver -h 0.0.0.0 -p 3000 -w workspace.yaml
+    ports:
+      - "3000:3000"
+    depends_on:
+      - target_db
+      - api
+    environment:
+      API_URL: http://api:8000
+      TARGET_DB_URL: postgresql://postgres:postgres@target_db:5432/target_db
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - ./dagster_home:/opt/dagster/dagster_home
+      - .:/app
+
+  dagster_daemon:
+    build: .
+    container_name: dagster_daemon
+    command: dagster-daemon run
+    depends_on:
+      - target_db
+      - api
+    environment:
+      API_URL: http://api:8000
+      TARGET_DB_URL: postgresql://postgres:postgres@target_db:5432/target_db
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - ./dagster_home:/opt/dagster/dagster_home
+      - .:/app
 
 volumes:
   source_db_data:

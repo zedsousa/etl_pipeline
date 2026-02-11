@@ -1,3 +1,8 @@
 .env
 __pycache__/
 *.pyc
+dagster_home/history/
+dagster_home/storage/
+dagster_home/logs/
+dagster_home/.nux/
+dagster_home/.telemetry/
