@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+from sqlalchemy import delete, insert
 from sqlalchemy.orm import Session
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -58,8 +59,22 @@ def transform_data(data: list[dict]) -> pd.DataFrame:
     return aggregated
 
 
-def load_data(df: pd.DataFrame, session: Session) -> None:
+def load_data(df: pd.DataFrame, session: Session, target_date: datetime) -> None:
     """Carrega dados agregados no banco de dados alvo."""
+
+    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    stmt_delete = delete(Data).where(
+        Data.timestamp >= start_of_day, Data.timestamp <= end_of_day
+    )
+    result = session.execute(stmt_delete)
+
+    if result.rowcount > 0:
+        logger.info(
+            f"Limpeza de partição: {result.rowcount} registros antigos removidos."
+        )
+
     logger.info("Carregando dados no banco alvo...")
 
     signal_map = {
@@ -79,14 +94,14 @@ def load_data(df: pd.DataFrame, session: Session) -> None:
         for metric, signal_id in signal_map.items():
             if not pd.isna(row[metric]):
                 data_points.append(
-                    Data(
-                        timestamp=row["timestamp"],
-                        signal_id=signal_id,
-                        value=float(row[metric]),
-                    )
+                    {
+                        "timestamp": row["timestamp"],
+                        "signal_id": signal_id,
+                        "value": float(row[metric]),
+                    }
                 )
 
-    session.add_all(data_points)
+    session.execute(insert(Data), data_points)
     session.commit()
 
     logger.info(f"{len(data_points)} registros carregados com sucesso.")
@@ -99,7 +114,7 @@ def run_etl(date: datetime, api_client: httpx.Client, db_session: Session) -> No
     try:
         data = extract_data(api_client, date)
         aggregated = transform_data(data)
-        load_data(aggregated, db_session)
+        load_data(aggregated, db_session, date)
     except Exception as e:
         logger.error(f"Erro durante o ETL: {str(e)}")
         raise e
