@@ -23,19 +23,12 @@ def get_data(
     if not all(v in VALID_COLUMNS for v in variables):
         raise HTTPException(status_code=400, detail="Invalid variables")
 
+    selected_columns = [Data.timestamp] + [getattr(Data, v) for v in variables]
+
     query = (
-        session.query(Data)
+        session.query(*selected_columns)
         .filter(Data.timestamp >= start_date, Data.timestamp <= end_date)
         .order_by(Data.timestamp)
     )
 
-    results = query.all()
-
-    response = []
-    for row in results:
-        item_dict = {"timestamp": row.timestamp}
-        for var in variables:
-            item_dict[var] = getattr(row, var)
-        response.append(DataResponse(**item_dict))
-
-    return response
+    return query.all()  # type: ignore
