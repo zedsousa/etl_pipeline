@@ -9,7 +9,7 @@ from sqlalchemy import delete, insert
 from sqlalchemy.orm import Session
 
 sys.path.append(str(Path(__file__).parent.parent))
-from models.target import Data
+from models.target import Data, Signal
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -77,21 +77,26 @@ def load_data(df: pd.DataFrame, session: Session, target_date: datetime) -> None
 
     logger.info("Carregando dados no banco alvo...")
 
-    signal_map = {
-        "wind_speed_mean": 1,
-        "wind_speed_min": 2,
-        "wind_speed_max": 3,
-        "wind_speed_std": 4,
-        "power_mean": 5,
-        "power_min": 6,
-        "power_max": 7,
-        "power_std": 8,
-    }
+    signal_names = [column for column in df.columns if column != "timestamp"]
+
+    db_signals = session.query(Signal).all()
+    signal_map = {signal.name: signal.id for signal in db_signals}
+
+    missing_signals = [signal for signal in signal_names if signal not in signal_map]
+
+    if missing_signals:
+        new_signals = [Signal(name=signal) for signal in missing_signals]
+        session.add_all(new_signals)
+        session.commit()
+        for signal in new_signals:
+            session.refresh(signal)
+        signal_map.update({signal.name: signal.id for signal in new_signals})
 
     data_points = []
 
     for _, row in df.iterrows():
-        for metric, signal_id in signal_map.items():
+        for metric in signal_names:
+            signal_id = signal_map.get(metric)
             if not pd.isna(row[metric]):
                 data_points.append(
                     {
