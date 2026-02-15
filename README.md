@@ -24,10 +24,10 @@ Pipeline ETL orquestrado com Dagster para processamento de dados de energia eól
     docker-compose exec dagster_webserver  python scripts/init_source_db.py
     ```
 
-4.  **Crie as tabelas no banco de dados alvo:**
-    ```bash
-    docker-compose exec dagster_webserver  python scripts/init_target_db.py
-    ```
+### Período de dados contido no banco
+
+Foi inserido no banco de dados fonte registros com frequência 1-minutal, compreendendo o período de 01/01/2026 a 10/01/2026.
+
 
 ### ✅ Acesso
 
